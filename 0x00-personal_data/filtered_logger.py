@@ -8,8 +8,14 @@ one function called filter_datum
 import logging
 from typing import List
 import re
+from os import getenv
+import mysql.connector
 
 
+PERSONAL_DATA_DB_HOST = getenv('PERSONAL_DATA_DB_HOST', default='localhost')
+PERSONAL_DATA_DB_USERNAME = getenv('PERSONAL_DATA_DB_USERNAME', default='root')
+PERSONAL_DATA_DB_PASSWORD = getenv('PERSONAL_DATA_DB_PASSWORD', default='root')
+PERSONAL_DATA_DB_NAME = getenv('PERSONAL_DATA_DB_NAME', default='holberton')
 PII_FIELDS = ['name', 'email', 'phone', 'password', 'ip']
 
 
@@ -40,16 +46,6 @@ def filter_datum(
 
     return ';'.join(obfuscated_message)
 
-
-def get_logger():
-    logger = logging.getLogger('user_data')
-    logger.setLevel(logging.INFO)
-    handler = logging.StreamHandler()
-    handler.formatter(RedactingFormatter(PII_FIELDS))
-    logger.addHandler(handler)
-    return logger
-
-
 class RedactingFormatter(logging.Formatter):
     """ Redacting Formatter class
         """
@@ -67,3 +63,45 @@ class RedactingFormatter(logging.Formatter):
         filtered_record.msg = filter_datum(self.fields, self.REDACTION,
                                            record.msg, self.SEPARATOR)
         return super().format(filtered_record)
+
+def get_logger():
+    logger = logging.getLogger('user_data')
+    logger.setLevel(logging.INFO)
+    handler = logging.StreamHandler()
+    handler.setFormatter(RedactingFormatter(fields=PII_FIELDS))
+    logger.addHandler(handler)
+    return logger
+
+
+def get_db():
+    db = mysql.connector.connect(
+            host=PERSONAL_DATA_DB_HOST,
+            user=PERSONAL_DATA_DB_USERNAME,
+            password=PERSONAL_DATA_DB_PASSWORD,
+            database=PERSONAL_DATA_DB_NAME
+        )
+    return db
+
+
+def main():
+    FIELDS = ['name', 'email', 'phone', 'ssn','password', 'ip', 'last_login', 'user_agent']
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT * FROM users;")
+    result = cursor.fetchall()
+
+    logger = get_logger()
+
+
+    for row in result:
+        user = []
+        for i in range(len(FIELDS)):
+            user.append(FIELDS[i] + '=' + str(row[i]))
+        logger.info(';'.join(user))
+
+    cursor.close()
+    db.close()
+
+
+if __name__ == "__main__":
+    main()
