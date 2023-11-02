@@ -46,25 +46,13 @@ def filter_datum(
 
     return ';'.join(obfuscated_message)
 
-class RedactingFormatter(logging.Formatter):
-    """ Redacting Formatter class
-        """
 
-    REDACTION = "***"
-    FORMAT = "[HOLBERTON] %(name)s %(levelname)s %(asctime)-15s: %(message)s"
-    SEPARATOR = ";"
+def get_logger() -> logging.Logger:
+    """creates a logging.Logger object
 
-    def __init__(self, fields: List[str]):
-        super(RedactingFormatter, self).__init__(self.FORMAT)
-        self.fields = fields
-
-    def format(self, record: logging.LogRecord) -> str:
-        filtered_record = record
-        filtered_record.msg = filter_datum(self.fields, self.REDACTION,
-                                           record.msg, self.SEPARATOR)
-        return super().format(filtered_record)
-
-def get_logger():
+    Returns:
+        logging.Logger: a logging.Logger object
+    """
     logger = logging.getLogger('user_data')
     logger.setLevel(logging.INFO)
     handler = logging.StreamHandler()
@@ -73,25 +61,32 @@ def get_logger():
     return logger
 
 
-def get_db():
+def get_db() -> mysql.connector.connection.MySQLConnection:
+    """connects to a database
+
+    Returns:
+        mysql.connector.connection.MySQLConnection: a connector to the database
+    """
     db = mysql.connector.connect(
-            host=PERSONAL_DATA_DB_HOST,
-            user=PERSONAL_DATA_DB_USERNAME,
-            password=PERSONAL_DATA_DB_PASSWORD,
-            database=PERSONAL_DATA_DB_NAME
-        )
+        host=PERSONAL_DATA_DB_HOST,
+        user=PERSONAL_DATA_DB_USERNAME,
+        password=PERSONAL_DATA_DB_PASSWORD,
+        database=PERSONAL_DATA_DB_NAME
+    )
     return db
 
 
 def main():
-    FIELDS = ['name', 'email', 'phone', 'ssn','password', 'ip', 'last_login', 'user_agent']
+    """retrieve, format and display all rows in the users table
+    """
+    FIELDS = ['name', 'email', 'phone', 'ssn',
+              'password', 'ip', 'last_login', 'user_agent']
     db = get_db()
     cursor = db.cursor()
     cursor.execute("SELECT * FROM users;")
     result = cursor.fetchall()
 
     logger = get_logger()
-
 
     for row in result:
         user = []
@@ -101,6 +96,38 @@ def main():
 
     cursor.close()
     db.close()
+
+
+class RedactingFormatter(logging.Formatter):
+    """ Redacting Formatter class
+        """
+
+    REDACTION = "***"
+    FORMAT = "[HOLBERTON] %(name)s %(levelname)s %(asctime)-15s: %(message)s"
+    SEPARATOR = ";"
+
+    def __init__(self, fields: List[str]):
+        """Redacting Formatter class constructor
+
+        Args:
+            fields (List[str]): all fields to obfuscate
+        """
+        super(RedactingFormatter, self).__init__(self.FORMAT)
+        self.fields = fields
+
+    def format(self, record: logging.LogRecord) -> str:
+        """filter values in incoming log records
+
+        Args:
+            record (logging.LogRecord): A log record
+
+        Returns:
+            str: record with filtered values
+        """
+        filtered_record = record
+        filtered_record.msg = filter_datum(self.fields, self.REDACTION,
+                                           record.msg, self.SEPARATOR)
+        return super().format(filtered_record)
 
 
 if __name__ == "__main__":
